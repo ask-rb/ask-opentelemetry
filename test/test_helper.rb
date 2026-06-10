@@ -1,3 +1,9 @@
 $LOAD_PATH.unshift File.expand_path("../../lib", __dir__)
 require "minitest/autorun"
-require "mocha/minitest" if Gem.loaded_specs.key?("mocha")
+
+# For OpenTelemetry test exporter support (opentelemetry-sdk is a runtime dep)
+begin
+  require "opentelemetry-sdk"
+rescue LoadError => e
+  warn "opentelemetry-sdk not available: #{e.message}"
+end

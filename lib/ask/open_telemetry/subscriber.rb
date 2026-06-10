@@ -1,37 +1,71 @@
 module Ask
   module OpenTelemetry
+    # Subscribes to Ask::Instrumentation events and creates OpenTelemetry spans.
+    #
+    # Maps each event name to a span name:
+    #   "chat.ask"        → "llm.chat"
+    #   "chat.stream.ask" → "llm.chat"
+    #   "tool.ask"        → "llm.tool"
+    #   "embedding.ask"   → "llm.embedding"
+    #   "image.ask"       → "llm.image"
+    #
+    # Forwards the event payload as span attributes under the +llm.*+ namespace
+    # and merges in any metadata from +Ask::Instrumentation.current_metadata+.
     class Subscriber
+      # Event name pattern → OpenTelemetry span name.
+      SPAN_NAMES = {
+        "chat.ask"        => "llm.chat",
+        "chat.stream.ask" => "llm.chat",
+        "tool.ask"        => "llm.tool",
+        "embedding.ask"   => "llm.embedding",
+        "image.ask"       => "llm.image"
+      }.freeze
+
+      # Invoked by +ActiveSupport::Notifications+ for each matching event.
+      #
+      # @param event [ActiveSupport::Notifications::Event] The instrumentation event
       def call(event)
-        case event.name
-        when "chat.ask"
-          create_span("llm.chat", event) do |span|
-            span.set_attribute("llm.provider", event.payload[:provider])
-            span.set_attribute("llm.model", event.payload[:model])
-            span.set_attribute("llm.input_tokens", event.payload[:input_tokens]) if event.payload[:input_tokens]
-            span.set_attribute("llm.output_tokens", event.payload[:output_tokens]) if event.payload[:output_tokens]
-          end
-        when "tool.ask"
-          create_span("llm.tool", event) do |span|
-            span.set_attribute("llm.tool", event.payload[:tool_name])
-          end
-        when "embedding.ask"
-          create_span("llm.embedding", event) do |span|
-            span.set_attribute("llm.provider", event.payload[:provider])
-            span.set_attribute("llm.model", event.payload[:model])
-          end
+        span_name = SPAN_NAMES[event.name]
+        return unless span_name
+
+        tracer.in_span(span_name, attributes: attributes_for(event)) do |span|
+          span.set_attribute("llm.duration_ms", (event.duration * 1000).round(2))
         end
       end
 
       private
 
-      def create_span(name, event)
-        tracer.in_span(name, attributes: {}) do |span|
-          yield span
+      def attributes_for(event)
+        payload = event.payload
+
+        attrs = {}
+
+        # Core llm attributes
+        attrs["llm.provider"]     = payload[:provider] if payload[:provider]
+        attrs["llm.model"]        = payload[:model]    if payload[:model]
+
+        # Token tracking (when available)
+        attrs["llm.input_tokens"]  = payload[:input_tokens]  if payload[:input_tokens]
+        attrs["llm.output_tokens"] = payload[:output_tokens] if payload[:output_tokens]
+
+        # Tool-specific
+        attrs["llm.tool"]    = payload[:tool_name] if payload[:tool_name]
+        attrs["llm.tool_args"] = payload[:tool_args] if payload[:tool_args] && payload[:tool_args].is_a?(String)
+
+        # Image-specific
+        attrs["llm.image.size"] = payload[:size] if payload[:size]
+
+        # Forward all metadata from the instrumentation context
+        Ask::Instrumentation.current_metadata.each do |key, value|
+          next if key.to_s.start_with?("llm.") # don't clobber explicit llm attributes
+          attrs["llm.metadata.#{key}"] = value
         end
+
+        attrs
       end
 
       def tracer
-        @tracer ||= OpenTelemetry.tracer_provider.tracer("ask-opentelemetry", Ask::OpenTelemetry::VERSION)
+        @tracer ||= ::OpenTelemetry.tracer_provider.tracer("ask-opentelemetry", Ask::OpenTelemetry::VERSION)
       end
     end
   end
