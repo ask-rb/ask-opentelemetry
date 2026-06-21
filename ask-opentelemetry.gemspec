@@ -22,7 +22,7 @@ Gem::Specification.new do |spec|
   spec.files = Dir["lib/**/*", "LICENSE", "README.md", "CHANGELOG.md"]
   spec.require_paths = ["lib"]
 
-  spec.add_dependency "ask-instrumentation", "~> 0.1"
+  spec.add_dependency "ask-instrumentation", ">= 0.1"
   spec.add_dependency "opentelemetry-api", "~> 1.3"
   spec.add_dependency "opentelemetry-sdk", "~> 1.7"
 
