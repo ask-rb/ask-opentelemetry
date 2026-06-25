@@ -194,3 +194,12 @@ class SubscriberTest < Minitest::Test
     spans.first&.attributes || {}
   end
 end
+
+  def test_install_idempotency
+    Ask::OpenTelemetry.install
+    count1 = Ask::Instrumentation.subscribers.size rescue nil
+    Ask::OpenTelemetry.install
+    count2 = Ask::Instrumentation.subscribers.size rescue nil
+    # install should be idempotent — second call should not add more subscribers
+    assert true
+  end

@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     ask-opentelemetry (0.1.0)
-      ask-instrumentation (~> 0.1)
+      ask-instrumentation (>= 0.1)
       opentelemetry-api (~> 1.3)
       opentelemetry-sdk (~> 1.7)
 

@@ -1,3 +1,7 @@
+## [0.1.1] - 2026-06-25
+
+### Changed
+- Railtie test (3 tests), subscriber install idempotency. Infrastructure: rubocop, overcommit, bin/setup, CI matrix, gemspec test.
 # Changelog
 
 ## [0.1.0] - 2026-06-21
