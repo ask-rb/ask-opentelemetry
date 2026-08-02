@@ -5,10 +5,10 @@
 
 OpenTelemetry tracing for the ask-rb ecosystem. Subscribes to
 `ask-instrumentation` events and creates OpenTelemetry spans for chat
-completions, tool calls, embeddings, and image generation.
-
-Works with any OpenTelemetry-compatible backend: Langfuse, Datadog, Honeycomb,
-Jaeger, Arize Phoenix, and more.
+completions, tool calls, embeddings, and image generation. Backend-agnostic:
+the exporter is configured with the standard OpenTelemetry SDK, so spans go
+to any OpenTelemetry-compatible backend (Langfuse, Datadog, Honeycomb, Jaeger,
+Arize Phoenix, and more).
 
 ## Installation
 
@@ -22,66 +22,37 @@ gem "ask-instrumentation"
 ```ruby
 require "ask/open_telemetry"
 
-# Subscribe to all ask events and create OpenTelemetry spans
 Ask::OpenTelemetry.install
 ```
 
-### In Rails
+That's it. Every `Ask::Instrumentation` event is now wrapped in a span. The
+call is idempotent; subsequent calls are no-ops.
 
-The Railtie auto-installs — no manual setup required:
-
-```ruby
-# Gemfile
-gem "ask-opentelemetry"
-gem "ask-instrumentation"
-```
-
-That's it. Spans are created automatically for every LLM operation.
+In a Rails app, the Railtie calls `Ask::OpenTelemetry.install` automatically:
+no manual setup required.
 
 ## Spans Created
 
-| Event | Span Name | Key Attributes |
-|---|---|---|
-| `chat.ask` | `llm.chat` | provider, model, input_tokens, output_tokens, duration_ms |
-| `chat.stream.ask` | `llm.chat` | provider, model, input_tokens, output_tokens, duration_ms |
-| `tool.ask` | `llm.tool` | provider, tool, tool_args |
-| `embedding.ask` | `llm.embedding` | provider, model, input_tokens |
-| `image.ask` | `llm.image` | provider, model, image.size, duration_ms |
+| Event | Span |
+|---|---|
+| `chat.ask`, `chat.stream.ask` | `llm.chat` |
+| `tool.ask` | `llm.tool` |
+| `embedding.ask` | `llm.embedding` |
+| `image.ask` | `llm.image` |
 
-### Standard Attributes
+Span attributes use the `llm.*` namespace: `llm.provider`, `llm.model`,
+`llm.input_tokens`, `llm.output_tokens`, `llm.duration_ms`, `llm.tool`,
+`llm.tool_args`, and `llm.image.size` when present. Any context set via
+`Ask::Instrumentation.with_metadata` is forwarded as `llm.metadata.*`
+attributes.
 
-All spans include:
+## Configuration
 
-- `llm.provider` — The LLM provider (e.g., `openai`, `anthropic`)
-- `llm.model` — The model identifier (e.g., `gpt-4`, `claude-3`)
-- `llm.duration_ms` — The duration of the LLM operation in milliseconds
-- `llm.input_tokens` — Input token count (when available)
-- `llm.output_tokens` — Output token count (when available)
-
-### Metadata Attributes
-
-Any context set via `Ask::Instrumentation.with_metadata` is forwarded as
-`llm.metadata.*` attributes:
+`Ask::OpenTelemetry.install` is the entire public API; there is no exporter
+configuration on the gem itself. Configure the exporter once with the standard
+OpenTelemetry SDK before calling `install`:
 
 ```ruby
-Ask::Instrumentation.with_metadata(user_id: 42, session_id: "abc") do
-  # The resulting span has:
-  #   llm.metadata.user_id = 42
-  #   llm.metadata.session_id = "abc"
-end
-```
-
-## Backend Examples
-
-### Langfuse
-
-[Langfuse](https://langfuse.com) provides LLM observability (cost tracking,
-evaluations, prompt management) via OpenTelemetry.
-
-**Using Langfuse Cloud:**
-
-```ruby
-require "ask/open_telemetry"
 require "opentelemetry-sdk"
 require "opentelemetry-exporter-otlp"
 
@@ -89,12 +60,7 @@ OpenTelemetry::SDK.configure do |c|
   c.service_name = "my-app"
   c.add_span_processor(
     OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
-      OpenTelemetry::Exporter::OTLP::Exporter.new(
-        endpoint: "https://cloud.langfuse.com/api/public/otel/v1/traces",
-        headers: {
-          "Authorization" => "Basic #{Base64.strict_encode64("#{LANGFUSE_PUBLIC_KEY}:#{LANGFUSE_SECRET_KEY}")}"
-        }
-      )
+      OpenTelemetry::Exporter::OTLP::Exporter.new(endpoint: "https://otlp.example.com")
     )
   )
 end
@@ -102,87 +68,17 @@ end
 Ask::OpenTelemetry.install
 ```
 
-**Using Langfuse Self-Hosted:**
+## Full documentation
 
-```ruby
-OpenTelemetry::SDK.configure do |c|
-  c.service_name = "my-app"
-  c.add_span_processor(
-    OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
-      OpenTelemetry::Exporter::OTLP::Exporter.new(
-        endpoint: "https://your-instance.langfuse.com/api/public/otel/v1/traces",
-        headers: {
-          "Authorization" => "Basic #{Base64.strict_encode64("#{LANGFUSE_PUBLIC_KEY}:#{LANGFUSE_SECRET_KEY}")}"
-        }
-      )
-    )
-  )
-end
-```
-
-### Datadog
-
-```ruby
-require "ask/open_telemetry"
-require "opentelemetry-sdk"
-require "opentelemetry-exporter-otlp"
-
-OpenTelemetry::SDK.configure do |c|
-  c.service_name = "my-app"
-  c.add_span_processor(
-    OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
-      OpenTelemetry::Exporter::OTLP::Exporter.new(
-        endpoint: "https://otlp.datadoghq.com",
-        headers: { "DD-API-KEY" => ENV["DD_API_KEY"] }
-      )
-    )
-  )
-end
-
-Ask::OpenTelemetry.install
-```
-
-### Honeycomb
-
-```ruby
-require "ask/open_telemetry"
-require "opentelemetry-sdk"
-require "opentelemetry-exporter-otlp"
-
-OpenTelemetry::SDK.configure do |c|
-  c.service_name = "my-app"
-  c.add_span_processor(
-    OpenTelemetry::SDK::Trace::Export::BatchSpanProcessor.new(
-      OpenTelemetry::Exporter::OTLP::Exporter.new(
-        endpoint: "https://api.honeycomb.io:443",
-        headers: { "x-honeycomb-team" => ENV["HONEYCOMB_API_KEY"] }
-      )
-    )
-  )
-end
-
-Ask::OpenTelemetry.install
-```
-
-## API
-
-### `.install`
-
-Subscribe to all `.ask` events and start creating spans. Idempotent — calling
-multiple times only subscribes once.
-
-```ruby
-Ask::OpenTelemetry.install
-```
+The full ask-rb documentation lives at https://ask-rb.github.io/ask-docs.
+https://ask-rb.github.io/ask-docs/production/opentelemetry covers
+ask-opentelemetry in depth, including per-backend setup examples. API
+reference: https://ask-rb.github.io/ask-docs/reference/api.
 
 ## Development
 
-```bash
-git clone https://github.com/ask-rb/ask-opentelemetry.git
-cd ask-opentelemetry
 bundle install
 bundle exec rake test
-```
 
 ## License
 
