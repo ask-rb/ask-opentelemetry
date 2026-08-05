@@ -2,6 +2,11 @@ require "ask/instrumentation"
 require "opentelemetry-api"
 require_relative "open_telemetry/version"
 
+# Rails discovers gem railties only when they are required, so load the
+# railtie from the entry file once Rails itself is on the stack (the
+# documented pattern: "require my_gem/railtie if defined?(Rails::Railtie)").
+require_relative "open_telemetry/railtie" if defined?(Rails::Railtie)
+
 module Ask
   # OpenTelemetry tracing for the ask-rb ecosystem.
   #
