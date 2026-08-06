@@ -1,3 +1,10 @@
+## [0.1.3] - 2026-08-06
+
+### Fixed
+- `llm.duration_ms` was microsecond values labeled as milliseconds
+  (`(event.duration * 1000)` — event.duration is already in ms; a 0.2s call
+  showed 203052). Now `event.duration.round(2)` — real milliseconds.
+
 ## [0.1.2] - 2026-08-06
 
 ### Fixed

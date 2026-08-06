@@ -29,7 +29,10 @@ module Ask
         return unless span_name
 
         tracer.in_span(span_name, attributes: attributes_for(event)) do |span|
-          span.set_attribute("llm.duration_ms", (event.duration * 1000).round(2))
+          # event.duration is already MILLISECONDS — multiplying by 1000
+          # produced microsecond values labeled as ms (a 0.2s call showed
+          # llm_duration_ms=203052).
+          span.set_attribute("llm.duration_ms", event.duration.round(2))
         end
       end
 

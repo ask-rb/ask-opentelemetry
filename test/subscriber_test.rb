@@ -147,6 +147,9 @@ class SubscriberTest < Minitest::Test
     attrs = span_attributes
     assert attrs["llm.duration_ms"].is_a?(Numeric), "duration_ms should be numeric"
     assert attrs["llm.duration_ms"] > 0, "duration_ms should be positive"
+    # event.duration is in milliseconds: a 10ms call must not show 10000ms
+    # (the old *1000 bug turned ms into µs and labeled it ms).
+    assert attrs["llm.duration_ms"] < 1000, "duration_ms should be milliseconds, not microseconds"
   end
 
   # --- metadata forwarding ---
