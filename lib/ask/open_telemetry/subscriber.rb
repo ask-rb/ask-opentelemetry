@@ -44,9 +44,12 @@ module Ask
         attrs["llm.provider"]     = payload[:provider] if payload[:provider]
         attrs["llm.model"]        = payload[:model]    if payload[:model]
 
-        # Token tracking (when available)
-        attrs["llm.input_tokens"]  = payload[:input_tokens]  if payload[:input_tokens]
-        attrs["llm.output_tokens"] = payload[:output_tokens] if payload[:output_tokens]
+        # Token tracking (when available). Chat events emitted by ask-agent
+        # enrich a shared nested +usage+ hash after the call returns (tokens
+        # are only known then); other emitters pass them at the top level.
+        usage = payload[:usage] || payload
+        attrs["llm.input_tokens"]  = usage[:input_tokens]  if usage[:input_tokens]
+        attrs["llm.output_tokens"] = usage[:output_tokens] if usage[:output_tokens]
 
         # Tool-specific
         attrs["llm.tool"]    = payload[:tool_name] if payload[:tool_name]

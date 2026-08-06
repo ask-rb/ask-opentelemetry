@@ -1,3 +1,12 @@
+## [0.1.2] - 2026-08-06
+
+### Fixed
+- `llm.input_tokens`/`llm.output_tokens` span attributes read from the nested
+  `usage` payload hash (ask-agent enriches it after the call returns; the
+  instrumenter shallow-copies the top-level payload). Top-level keys still
+  work for other emitters. `llm.duration_ms` now reflects the real LLM call
+  duration thanks to the ask-agent event fix.
+
 ## [0.1.1] - 2026-06-25
 
 ### Changed

@@ -84,6 +84,17 @@ class SubscriberTest < Minitest::Test
     assert_nil attrs["llm.output_tokens"]
   end
 
+  def test_chat_attributes_from_nested_usage_hash
+    # ask-agent enriches a shared nested +usage+ hash after the call returns
+    # (tokens are only known then); the subscriber must read from it.
+    instrument("chat.ask", provider: "openai", model: "gpt-4",
+               usage: { input_tokens: 100, output_tokens: 50 })
+
+    attrs = span_attributes
+    assert_equal 100, attrs["llm.input_tokens"]
+    assert_equal 50, attrs["llm.output_tokens"]
+  end
+
   # --- attributes: tool ---
 
   def test_tool_attributes
